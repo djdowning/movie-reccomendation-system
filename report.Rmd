@@ -16,9 +16,9 @@ options(tinytex.verbose = TRUE)
 
 # Introduction
 
-This is a report on optimizing a movie recommendation system to provide more accurate predictions based on historical rating data.  To complete this analysis, a subset of the MovieLens Dataset obtained from *https://grouplens.org/datasets/movielens/10m/* was used.  The dataset includes over 9,000,000 movie reviews on over 10,000 different movies.
+This is a report on optimizing a movie recommendation system to provide more accurate predictions based on historical rating data.  To complete this analysis, a subset of the MovieLens data set obtained from *https://grouplens.org/datasets/movielens/10m/* was used.  The data set includes over 9,000,000 movie reviews on over 10,000 different movies.
 
-The simplest way to predict a rating for a particular movie from a particular user would be to simply use the average (mean) of all ratings from all users and use this average to predict all ratings.  The below shows the mean as well as the residual mean squared error (RSME) from this dataset:  
+The simplest way to predict a rating for a particular movie from a particular user would be to simply use the average (mean) of all ratings from all users and use this average to predict all ratings.  The below shows the mean as well as the residual mean squared error (RSME) from this data set:  
 
 ```{r, echo=FALSE}
 load("rda/edx.rda")
@@ -48,21 +48,22 @@ c(Mean=edx_mu, RMSE=edx_naive_rmse) %>%
              full_width = FALSE)
 ```
 
-The goal of this project was to apply machine learning techniques to lower the RMSE to below 0.86490 which was able to be acheived by examining the following:  
+The goal of this project was to apply machine learning techniques to lower the RMSE to below 0.86490 which was able to be achieved by examining the following:  
 1. The Movie Effect - Understanding that some movies score better or score worse than others  
 2. The User Effect - Understanding that some users give higher or lower scores than others  
-3. The Regularization Effect - Understanding that more uncertaintly due to the smaller sample size impacts both:  
+3. The Regularization Effect - Understanding that more uncertainty due to the smaller sample size impacts both:  
    i) Movies that have received a very small number of reviews  
    ii) Users that have given a very small number of reviews    
 
-By controlling for these factors the RMSE goal was acheived with a final RMSE of **0.8648** was able to be achieved.
+By controlling for these factors the RMSE goal was achieved with a final RMSE of **0.8648**.
 
 \newpage
 
 # Methods / Analysis
-In order to avoid overfitting our model, the data was split into a training set and a test set.  Only the traning set was used to create the models.  The test set was only used for validation of the model results as a control for the RMSE.
+In order to avoid over-fitting our model, the data was split into a training set and a test set.  Only the training set was used to create the models.  The test set was only used for validation of the model results as a control for the RMSE.
 
-To begin, an examination was taken of the effect caused by the movies themselves - simply that some movies are better than others. This can clearly be seen below in that some movies score much higher than others and vice vera:  
+## Movie Effect
+To begin, an examination was taken of the effect caused by the movies themselves - simply that some movies are better than others. This can clearly be seen below in that some movies score much higher than others and vice versa:  
 
 ```{r, echo=FALSE}
 edx_movie_avgs <- edx %>% 
@@ -90,7 +91,7 @@ edx_rmse_results <- bind_rows(edx_rmse_results,
                           tibble(method="Movie Effect Model",
                                      RMSE = edx_1_rmse ))
 ```
-
+## Movie + User Effect
 The next step was to examine the user effect.  Looking at all users who had at least 50 reviews, the same trend that was just illustrated for movies also applies for users - some users are much harsher with their ratings and some are much more generous:  
 
 ```{r, echo=FALSE}
@@ -128,7 +129,7 @@ edx_rmse_results <- bind_rows(edx_rmse_results,
                                      RMSE = edx_2_rmse ))
 
 ```
-
+## Regularized Movie Effect
 Looking at both the predicted best and predicted worst movies from the model to this point, something very interesting can be noticed:  
 
 **Best Predicted Movies:**
@@ -236,8 +237,9 @@ edx %>%
              full_width = FALSE)
 ```
 
-Now that makes a lot more sense as the best list is now littered with movies widely considered clasics. Unfortunately for fans of *Superbabies 2: Baby Geniuses* and  *From Justin to Kelly* - not only do they still make the worst list but they are now in the top 2 spots.
+Now that makes a lot more sense as the best list is now littered with movies widely considered classics. Unfortunately for fans of *Superbabies: Baby Geniuses 2* and  *From Justin to Kelly* - not only do they still make the worst list but they are now in the top 2 spots.
 
+## Regularized Movie + User Effect
 In addition to these movies with a very low number of reviews, there are also users that have a very small number of reviews which also has an impact on the RMSE.  So the model needs to be adjusted to handle small sample sizes for users in addition to the movies.  The exact same regularization method that was just applied to the movie bias can be applied to the user bias.  With these improvements the model can be updated and denoted as **Regularized Movie + User Effect Model**.
 
 ```{r, echo=FALSE}
@@ -285,5 +287,5 @@ The above RMSE table shows that once the movie effect is introduced, some improv
 \newpage
 
 # Conclusion
-By appplying these methods, a very significant improvement to the predicted movie ratings was achieved. 
+By applying these methods, a very significant improvement to the predicted movie ratings was achieved. 
 There is however a very significant factor that has not been addressed in this analysis.  An important source of variation comes from the fact that certain groups of movies and certain groups of users have very similar rating patterns. It is possible that these patterns could be observed by studying the residuals and converting the data into a matrix where each user gets a row and each movie gets a column.  Matrix factorization could then be performed to see if the model can be improved upon even further.
