@@ -16,7 +16,7 @@ options(tinytex.verbose = TRUE)
 
 # Introduction
 
-This is a report on optimizing movie recommendation systems to provide more accurate recommedations to users based on historical rating data.  To complete this analysis, a subset of the MovieLens Dataset obtained from [this web page]( https://grouplens.org/datasets/movielens/10m/) was used.  The dataset includes over 9,000,000 movie reviews on over 10,000 different movies.
+This is a report on optimizing a movie recommendation system to provide more accurate predictions based on historical rating data.  To complete this analysis, a subset of the MovieLens Dataset obtained from *https://grouplens.org/datasets/movielens/10m/* was used.  The dataset includes over 9,000,000 movie reviews on over 10,000 different movies.
 
 The simplest way to predict a rating for a particular movie from a particular user would be to simply use the average (mean) of all ratings from all users and use this average to predict all ratings.  The below shows the mean as well as the residual mean squared error (RSME) from this dataset:  
 
@@ -78,7 +78,7 @@ $$Y_{u,i} = \hat{\mu} + b_i + \epsilon_{u,i}$$
 
 Where $\hat{\mu}$ is the mean, $\varepsilon_{i,u}$ is the independent errors sampled from the distribution centered at 0 and the term $b_i$ is used for bias control of movie $i$ as a measure of popularity.
 
-This effect can be applied to our model and denoted as the *Movie Effect Model*.  
+This effect can be applied to our model and denoted as the **Movie Effect Model**.  
 
 ```{r, echo=FALSE}
 predicted_ratings <- edx_mu + validation %>% 
@@ -107,7 +107,7 @@ edx %>%
 
 To control for this a new term $b_u$ can be added to the equation so that the formula now becomes:  
 $$Y_{u,i} = \hat{\mu} + b_i + b_u + \epsilon_{u,i}$$
-The term $b_u$ is added to measure for the bias of user $u$.  This effect can be applied to our model and denoted as the *Movie + User Effect Model*.
+The term $b_u$ is added to measure for the bias of user $u$.  This effect can be applied to our model and denoted as the **Movie + User Effect Model**.
 
 
 ```{r, echo=FALSE}
@@ -131,7 +131,7 @@ edx_rmse_results <- bind_rows(edx_rmse_results,
 
 Looking at both the predicted best and predicted worst movies from the model to this point, something very interesting can be noticed:  
 
-*Best Predicted Movies:*
+**Best Predicted Movies:**
 
 ```{r, echo=FALSE, message=FALSE}
 edx_movie_titles <- edx %>% 
@@ -151,7 +151,8 @@ edx %>% dplyr::count(movieId) %>%
              full_width = FALSE)  
 ```
 \newpage
-*Worst Predicted Movies:*
+
+**Worst Predicted Movies:**
 ```{r, echo=FALSE, message=FALSE}
 edx %>% dplyr::count(movieId) %>% 
   left_join(edx_movie_avgs) %>%
@@ -169,7 +170,7 @@ edx %>% dplyr::count(movieId) %>%
 Look how obscure most of these movies are. To compensate for this, regularization can be used to handle movies with just a small number of reviews.  This method adds a component $\lambda$ (lambda) that penalizes movies that are increasing the RMSE due to a small sample size. The following equation is used to optimize $b_i$ to account for this sample size variance:  
 
 $$\frac{1}{N} \sum_{u,i} (y_{u,i} - \mu - b_{i})^{2} + \lambda \sum_{i} b_{i}^2$$   
-This effect can now be added to the model and denoted as the *Regularized Movie Effect Model*.  After making this adjustment, take a look at the best and worst list now:    
+This effect can now be added to the model and denoted as the **Regularized Movie Effect Model**.  After making this adjustment, take a look at the best and worst list now:    
 
 ```{r, echo=FALSE}
 lambdas <- seq(0, 10, 0.25)
@@ -192,7 +193,7 @@ edx_rmse_results <- bind_rows(edx_rmse_results,
 
 
 
-*Updated Best Predicted Movies:*
+**Updated Best Predicted Movies:**
 
 
 ```{r, echo=FALSE, message=FALSE}
@@ -218,7 +219,7 @@ edx %>%
 
 \newpage
 
-*Updated Worst Predicted Movies:*
+**Updated Worst Predicted Movies:**
 
 ```{r, echo=FALSE, message=FALSE}
 edx %>%
@@ -235,9 +236,9 @@ edx %>%
              full_width = FALSE)
 ```
 
-Now that makes a lot more sense!  Unfortunately for From Justin to Kelly and Superbabies - they still make the worst list.  
+Now that makes a lot more sense as the best list is now littered with movies widely considered clasics. Unfortunately for fans of *Superbabies 2: Baby Geniuses* and  *From Justin to Kelly* - not only do they still make the worst list but they are now in the top 2 spots.
 
-In addition to these movies with a very low number of reviews, there are also users that have a very small number of reviews which also has an impact on the RMSE.  So the model needs to be adjusted to handle small sample sizes for users in addition to the movies.  The exact same regularization method that was just applied to the movie bias can be applied to the user bias.  With these improvements the model can be updated and denoted as *Regularized Movie + User Effect Model*.
+In addition to these movies with a very low number of reviews, there are also users that have a very small number of reviews which also has an impact on the RMSE.  So the model needs to be adjusted to handle small sample sizes for users in addition to the movies.  The exact same regularization method that was just applied to the movie bias can be applied to the user bias.  With these improvements the model can be updated and denoted as **Regularized Movie + User Effect Model**.
 
 ```{r, echo=FALSE}
 lambdas2 <- seq(0, 10, 0.25)
@@ -279,7 +280,7 @@ edx_rmse_results %>%
 ```
 
 
-The above RMSE table shows that once the movie effect is introduced, some improvement in accuracy is achieved. However, once the model is adjusted to account for both the movie AND the user effect, much better improvement is seen.  In fact,  the goal RMSE is almost achieved with this method.  However, while close to the objective this model is not quite there just yet. Next by adding the regularization effect to control for movies with small numbers of reviews, the RMSE is improved a bit vs. using the movie effect model without regularization. Once the model puts it all together and adds in regularization to also account for the users with smaller number of reviews, the goal of getting below the target RMSE of 0.8649 is achieved.
+The above RMSE table shows that once the movie effect is introduced, some improvement in accuracy is achieved. However, once the model is adjusted to account for both the movie AND the user effect, much better improvement is seen.  In fact,  the goal RMSE is almost achieved with this method.  However, while close to the objective, this model is not quite there just yet. Next by adding the regularization effect to control for movies with small numbers of reviews, the RMSE is improved a bit vs. using the movie effect model without regularization. Once the model puts it all together and adds in regularization to also account for  users with smaller number of reviews, the goal of getting below the target RMSE of 0.8649 is achieved.
 
 \newpage
 
