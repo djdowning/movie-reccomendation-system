@@ -55,7 +55,7 @@ The goal of this project was to apply machine learning techniques to lower the R
    i) Movies that have received a very small number of reviews  
    ii) Users that have given a very small number of reviews    
 
-By controlling for these factors the goal of reducing the RMSE below 0.8649 was able to be achieved.
+By controlling for these factors the RMSE goal was acheived with a final RMSE of **0.8648** was able to be achieved.
 
 \newpage
 
@@ -280,7 +280,7 @@ edx_rmse_results %>%
 ```
 
 
-The above RMSE table shows that once the movie effect is introduced, some improvement in accuracy is achieved. However, once the model is adjusted to account for both the movie AND the user effect, much better improvement is seen.  In fact,  the goal RMSE is almost achieved with this method.  However, while close to the objective, this model is not quite there just yet. Next by adding the regularization effect to control for movies with small numbers of reviews, the RMSE is improved a bit vs. using the movie effect model without regularization. Once the model puts it all together and adds in regularization to also account for  users with smaller number of reviews, the goal of getting below the target RMSE of 0.8649 is achieved.
+The above RMSE table shows that once the movie effect is introduced, some improvement in accuracy is achieved. However, once the model is adjusted to account for both the movie AND the user effect, much better improvement is seen.  In fact,  the goal RMSE is almost achieved with this method.  However, while close to the objective, this model is not quite there just yet. Next by adding the regularization effect to control for movies with small numbers of reviews, the RMSE is improved a bit vs. using the movie effect model without regularization. Once the model puts it all together and adds in regularization to also account for  users with smaller number of reviews, the goal of getting below the target RMSE of 0.8649 is achieved with a final RSME of **0.8648**.
 
 \newpage
 
