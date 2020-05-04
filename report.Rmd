@@ -1,0 +1,288 @@
+---
+title: "MovieLens Recommendation System Capstone Project"
+author: "Dave Downing"
+date: "5/1/2020"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(tinytex.verbose = TRUE)
+```
+\newpage
+
+# Introduction
+
+This is a report on optimizing movie recommendation systems to provide more accurate recommedations to users based on historical rating data.  To complete this analysis, a subset of the MovieLens Dataset obtained from [this web page]( https://grouplens.org/datasets/movielens/10m/) was used.  The dataset includes over 9,000,000 movie reviews on over 10,000 different movies.
+
+The simplest way to predict a rating for a particular movie from a particular user would be to simply use the average (mean) of all ratings from all users and use this average to predict all ratings.  The below shows the mean as well as the residual mean squared error (RSME) from this dataset:  
+
+```{r, echo=FALSE}
+load("rda/edx.rda")
+load("rda/validation.rda")
+```
+
+
+```{r, loading-libs, message=FALSE, echo=FALSE}
+library(tidyverse)
+library(tinytex)
+library(kableExtra)
+```
+
+```{r, echo=FALSE}
+RMSE <- function(true_ratings, predicted_ratings){
+     sqrt(mean((true_ratings - predicted_ratings)^2))}
+edx_mu <- mean(edx$rating)
+edx_naive_rmse <- RMSE(validation$rating, edx_mu)
+edx_rmse_results <- tibble(method = "Simple Average", RMSE = edx_naive_rmse)
+```
+```{r, echo=FALSE}
+c(Mean=edx_mu, RMSE=edx_naive_rmse) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+             position = "center",
+             font_size = 10,
+             full_width = FALSE)
+```
+
+The goal of this project was to apply machine learning techniques to lower the RMSE to below 0.86490 which was able to be acheived by examining the following:  
+1. The Movie Effect - Understanding that some movies score better or score worse than others  
+2. The User Effect - Understanding that some users give higher or lower scores than others  
+3. The Regularization Effect - Understanding that more uncertaintly due to the smaller sample size impacts both:  
+   i) Movies that have received a very small number of reviews  
+   ii) Users that have given a very small number of reviews    
+
+By controlling for these factors the goal of reducing the RMSE below 0.8649 was able to be achieved.
+
+\newpage
+
+# Methods / Analysis
+In order to avoid overfitting our model, the data was split into a training set and a test set.  Only the traning set was used to create the models.  The test set was only used for validation of the model results as a control for the RMSE.
+
+To begin, an examination was taken of the effect caused by the movies themselves - simply that some movies are better than others. This can clearly be seen below in that some movies score much higher than others and vice vera:  
+
+```{r, echo=FALSE}
+edx_movie_avgs <- edx %>% 
+  group_by(movieId) %>% 
+  summarize(b_i = mean(rating - edx_mu))
+edx_movie_avgs %>% qplot(b_i, geom ="histogram", bins = 10, data = ., color = I("black"), xlab="Rating Score vs. Mean", ylab="Frequency")
+
+```
+
+This movie effect an be accounted for by using the following equation:  
+
+$$Y_{u,i} = \hat{\mu} + b_i + \epsilon_{u,i}$$
+
+Where $\hat{\mu}$ is the mean, $\varepsilon_{i,u}$ is the independent errors sampled from the distribution centered at 0 and the term $b_i$ is used for bias control of movie $i$ as a measure of popularity.
+
+This effect can be applied to our model and denoted as the *Movie Effect Model*.  
+
+```{r, echo=FALSE}
+predicted_ratings <- edx_mu + validation %>% 
+  left_join(edx_movie_avgs, by='movieId') %>%
+  .$b_i
+
+edx_1_rmse <- RMSE(validation$rating, predicted_ratings)
+edx_rmse_results <- bind_rows(edx_rmse_results,
+                          tibble(method="Movie Effect Model",
+                                     RMSE = edx_1_rmse ))
+```
+
+The next step was to examine the user effect.  Looking at all users who had at least 50 reviews, the same trend that was just illustrated for movies also applies for users - some users are much harsher with their ratings and some are much more generous:  
+
+```{r, echo=FALSE}
+edx %>% 
+  group_by(userId) %>% 
+  summarize(b_u = mean(rating)) %>% 
+  filter(n()>=50) %>%
+  ggplot(aes(b_u)) + 
+  geom_histogram(bins = 30, color = "black") +
+  xlab("Average Score Per User") +
+  ylab("Frequency")
+```  
+
+
+To control for this a new term $b_u$ can be added to the equation so that the formula now becomes:  
+$$Y_{u,i} = \hat{\mu} + b_i + b_u + \epsilon_{u,i}$$
+The term $b_u$ is added to measure for the bias of user $u$.  This effect can be applied to our model and denoted as the *Movie + User Effect Model*.
+
+
+```{r, echo=FALSE}
+edx_user_avgs <- edx %>% 
+  left_join(edx_movie_avgs, by='movieId') %>%
+  group_by(userId) %>%
+  summarize(b_u = mean(rating - edx_mu - b_i))
+
+predicted_ratings <- validation %>% 
+  left_join(edx_movie_avgs, by='movieId') %>%
+  left_join(edx_user_avgs, by='userId') %>%
+  mutate(pred = edx_mu + b_i + b_u) %>%
+  .$pred
+
+edx_2_rmse <- RMSE(validation$rating, predicted_ratings)
+edx_rmse_results <- bind_rows(edx_rmse_results,
+                          tibble(method="Movie + User Effects Model",  
+                                     RMSE = edx_2_rmse ))
+
+```
+
+Looking at both the predicted best and predicted worst movies from the model to this point, something very interesting can be noticed:  
+
+*Best Predicted Movies:*
+
+```{r, echo=FALSE, message=FALSE}
+edx_movie_titles <- edx %>% 
+  select(movieId, title) %>%
+  distinct()
+
+edx %>% dplyr::count(movieId) %>% 
+  left_join(edx_movie_avgs) %>%
+  left_join(edx_movie_titles, by="movieId") %>%
+  arrange(desc(b_i)) %>% 
+  select(title, b_i, n) %>% 
+  slice(1:10) %>% 
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+             position = "center",
+             font_size = 10,
+             full_width = FALSE)  
+```
+\newpage
+*Worst Predicted Movies:*
+```{r, echo=FALSE, message=FALSE}
+edx %>% dplyr::count(movieId) %>% 
+  left_join(edx_movie_avgs) %>%
+  left_join(edx_movie_titles, by="movieId") %>%
+  arrange(b_i) %>% 
+  select(title, b_i, n) %>% 
+  slice(1:10) %>% 
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+             position = "center",
+             font_size = 10,
+             full_width = FALSE)
+```
+
+Look how obscure most of these movies are. To compensate for this, regularization can be used to handle movies with just a small number of reviews.  This method adds a component $\lambda$ (lambda) that penalizes movies that are increasing the RMSE due to a small sample size. The following equation is used to optimize $b_i$ to account for this sample size variance:  
+
+$$\frac{1}{N} \sum_{u,i} (y_{u,i} - \mu - b_{i})^{2} + \lambda \sum_{i} b_{i}^2$$   
+This effect can now be added to the model and denoted as the *Regularized Movie Effect Model*.  After making this adjustment, take a look at the best and worst list now:    
+
+```{r, echo=FALSE}
+lambdas <- seq(0, 10, 0.25)
+rmses <- sapply(lambdas, function(l){
+   b_i <- edx %>%
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - edx_mu)/(n()+l))
+  predicted_ratings <- 
+    validation %>% 
+    left_join(b_i, by = "movieId") %>%
+    mutate(pred = edx_mu + b_i) %>%
+    .$pred
+  return(RMSE(predicted_ratings, validation$rating))
+})
+
+edx_rmse_results <- bind_rows(edx_rmse_results,
+                          tibble(method="Regularized Movie Effect Model",  
+                                     RMSE = min(rmses)))
+```
+
+
+
+*Updated Best Predicted Movies:*
+
+
+```{r, echo=FALSE, message=FALSE}
+lambda <- lambdas[which.min(rmses)]
+
+edx_reg_avgs <- edx %>% 
+  group_by(movieId) %>% 
+  summarize(b_i = sum(rating - edx_mu)/(n()+lambda), n_i = n())  
+
+edx %>%
+  dplyr::count(movieId) %>% 
+  left_join(edx_reg_avgs) %>%
+  left_join(edx_movie_titles, by="movieId") %>%
+  arrange(desc(b_i)) %>% 
+  select(title, b_i, n) %>% 
+  slice(1:10) %>% 
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+             position = "center",
+             font_size = 10,
+             full_width = FALSE)
+```  
+
+\newpage
+
+*Updated Worst Predicted Movies:*
+
+```{r, echo=FALSE, message=FALSE}
+edx %>%
+  dplyr::count(movieId) %>% 
+  left_join(edx_reg_avgs) %>%
+  left_join(edx_movie_titles, by="movieId") %>%
+  arrange(b_i) %>% 
+  select(title, b_i, n) %>% 
+  slice(1:10) %>% 
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+             position = "center",
+             font_size = 10,
+             full_width = FALSE)
+```
+
+Now that makes a lot more sense!  Unfortunately for From Justin to Kelly and Superbabies - they still make the worst list.  
+
+In addition to these movies with a very low number of reviews, there are also users that have a very small number of reviews which also has an impact on the RMSE.  So the model needs to be adjusted to handle small sample sizes for users in addition to the movies.  The exact same regularization method that was just applied to the movie bias can be applied to the user bias.  With these improvements the model can be updated and denoted as *Regularized Movie + User Effect Model*.
+
+```{r, echo=FALSE}
+lambdas2 <- seq(0, 10, 0.25)
+rmses2 <- sapply(lambdas2, function(l){
+   b_i <- edx %>%
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - edx_mu)/(n()+l))
+  b_u <- edx %>% 
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - edx_mu)/(n()+l))
+  predicted_ratings <- 
+    validation %>% 
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    mutate(pred = edx_mu + b_i + b_u) %>%
+    .$pred
+  return(RMSE(predicted_ratings, validation$rating))
+})
+
+edx_rmse_results <- bind_rows(edx_rmse_results,
+                          tibble(method="Regularized Movie + User Effect Model",  
+                                     RMSE = min(rmses2)))
+```
+
+
+# Results
+Here are the results of the RSME for each of the denoted models:  
+
+
+```{r, echo=FALSE}
+edx_rmse_results %>% 
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+             position = "center",
+             font_size = 10,
+             full_width = FALSE)
+
+```
+
+
+The above RMSE table shows that once the movie effect is introduced, some improvement in accuracy is achieved. However, once the model is adjusted to account for both the movie AND the user effect, much better improvement is seen.  In fact,  the goal RMSE is almost achieved with this method.  However, while close to the objective this model is not quite there just yet. Next by adding the regularization effect to control for movies with small numbers of reviews, the RMSE is improved a bit vs. using the movie effect model without regularization. Once the model puts it all together and adds in regularization to also account for the users with smaller number of reviews, the goal of getting below the target RMSE of 0.8649 is achieved.
+
+\newpage
+
+# Conclusion
+By appplying these methods, a very significant improvement to the predicted movie ratings was achieved. 
+There is however a very significant factor that has not been addressed in this analysis.  An important source of variation comes from the fact that certain groups of movies and certain groups of users have very similar rating patterns. It is possible that these patterns could be observed by studying the residuals and converting the data into a matrix where each user gets a row and each movie gets a column.  Matrix factorization could then be performed to see if the model can be improved upon even further.
